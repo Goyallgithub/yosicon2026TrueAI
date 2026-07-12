@@ -6,6 +6,7 @@ import PatientTalk from "./pages/PatientTalk.jsx";
 import PatientReport from "./pages/PatientReport.jsx";
 import DoctorDashboard from "./pages/DoctorDashboard.jsx";
 import DoctorCase from "./pages/DoctorCase.jsx";
+import PatientPrescription from "./pages/PatientPrescription.jsx";
 import EMR from "./pages/EMR.jsx";
 
 function AppShell({ children }) {
@@ -53,6 +54,22 @@ export default function App() {
             element={
               <RequireRole role="doctor">
                 <DoctorCase />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/patient/prescription"
+            element={
+              <RequireRole role="patient">
+                <PatientPrescription />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/patient/prescription/:id"
+            element={
+              <RequireRole role="patient">
+                <PatientPrescription />
               </RequireRole>
             }
           />

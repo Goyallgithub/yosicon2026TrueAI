@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { Stethoscope, LayoutDashboard, FileHeart } from "lucide-react";
+import { Stethoscope, LayoutDashboard, FileHeart, FileText } from "lucide-react";
 import GeometricLogo from "../ui/GeometricLogo.jsx";
 import Button from "../ui/Button.jsx";
 import { useAppStore } from "../../store/useAppStore.js";
@@ -46,6 +46,19 @@ export default function Navbar() {
             <span className="hidden sm:inline">Doctor Dashboard</span>
             <span className="sm:hidden">Doctor</span>
           </Button>
+
+          {role === "patient" && (
+            <Button
+              variant="red"
+              shape="pill"
+              onClick={() => navigate(currentCaseId ? `/patient/prescription/${currentCaseId}` : "/patient/prescription")}
+              className="!px-3 !py-2 text-[10px] sm:!px-4 sm:text-xs"
+            >
+              <FileText className="h-4 w-4" strokeWidth={3} />
+              <span className="hidden sm:inline">Dawai Report</span>
+              <span className="sm:hidden">Report</span>
+            </Button>
+          )}
 
           {currentCaseId && role === "patient" && (
             <Button

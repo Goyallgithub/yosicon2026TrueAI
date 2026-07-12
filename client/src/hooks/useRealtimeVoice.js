@@ -423,7 +423,7 @@ export function useFallbackVoice({
       const audioBlob = await apiCallBlob("/api/speak", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, context: "rakshak" }),
       });
       const url = URL.createObjectURL(audioBlob);
       const audio = new Audio(url);

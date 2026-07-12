@@ -10,7 +10,7 @@ function parseBody(options) {
 }
 
 export async function handleDemoApi(path, options = {}) {
-  await new Promise((r) => setTimeout(r, 300));
+  await new Promise((r) => setTimeout(r, 200));
 
   if (path === "/api/voice-mode") {
     return { useRealtime: false };
@@ -49,8 +49,8 @@ export async function handleDemoApi(path, options = {}) {
   }
 
   if (path === "/api/health") {
-    return { status: "ok", mode: "demo" };
+    return { status: "ok", mode: "frontend-only" };
   }
 
-  throw new Error("Demo mode — live voice & OpenAI features run on localhost only.");
+  throw new Error("Frontend-only demo — no live API.");
 }

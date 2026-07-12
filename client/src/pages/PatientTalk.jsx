@@ -1,24 +1,20 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { CheckCircle, Phone, PhoneOff, Stethoscope, Clock, Play } from "lucide-react";
-import { apiCall, IS_DEMO_MODE } from "../api/client.js";
+import { Link, useNavigate } from "react-router-dom";
+import { CheckCircle, Play, Stethoscope, Clock, FileText } from "lucide-react";
+import { apiCall } from "../api/client.js";
 import { DEMO_SAMPLE_MESSAGES, DEMO_SAMPLE_TRANSCRIPT } from "../data/demoCases.js";
 import { useAppStore } from "../store/useAppStore.js";
-import { useVoice } from "../hooks/useVoice.js";
 import ConversationStage from "../components/ConversationStage.jsx";
-import ErrorBanner from "../components/ErrorBanner.jsx";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
 import Card from "../components/ui/Card.jsx";
 import Button from "../components/ui/Button.jsx";
 
 const LANGUAGES = [
-  { id: "both", label: "Hindi + English + Tamil", sub: "Auto-detect — multilingual" },
-  { id: "hi", label: "हिंदी", sub: "Hindi only" },
-  { id: "ta", label: "தமிழ்", sub: "Tamil only" },
-  { id: "en", label: "English", sub: "English only" },
+  { id: "both", label: "Hindi + English + Tamil", sub: "Multilingual demo" },
+  { id: "hi", label: "हिंदी", sub: "Hindi" },
+  { id: "ta", label: "தமிழ்", sub: "Tamil" },
+  { id: "en", label: "English", sub: "English" },
 ];
-
-const MAX_CALL_SECONDS = 180;
 
 function formatTime(secs) {
   const m = Math.floor(secs / 60);
@@ -30,98 +26,40 @@ export default function PatientTalk() {
   const navigate = useNavigate();
   const setCurrentCaseId = useAppStore((s) => s.setCurrentCaseId);
   const openDoctorView = useAppStore((s) => s.openDoctorView);
-  const [useRealtime, setUseRealtime] = useState(null);
-  const [modeError, setModeError] = useState(null);
   const [language, setLanguage] = useState("both");
-  const [transcript, setTranscript] = useState("");
   const [messages, setMessages] = useState([]);
   const [processing, setProcessing] = useState(false);
-  const [processError, setProcessError] = useState(null);
   const [submitted, setSubmitted] = useState(false);
   const [savedCaseId, setSavedCaseId] = useState(null);
   const [callSeconds, setCallSeconds] = useState(0);
   const [demoActive, setDemoActive] = useState(false);
   const [demoConnectionState, setDemoConnectionState] = useState("idle");
 
-  const fetchMode = useCallback(async () => {
-    if (IS_DEMO_MODE) {
-      setUseRealtime(false);
-      return;
-    }
+  const finishIntake = useCallback(async () => {
     try {
-      setModeError(null);
-      const data = await apiCall("/api/voice-mode");
-      setUseRealtime(data.useRealtime);
-    } catch (err) {
-      setModeError(err.message);
-      setUseRealtime(true);
+      setProcessing(true);
+      const brief = await apiCall("/api/extract", {
+        method: "POST",
+        body: JSON.stringify({ transcript: DEMO_SAMPLE_TRANSCRIPT }),
+      });
+      const { data: savedCase } = await apiCall("/api/cases", {
+        method: "POST",
+        body: JSON.stringify({
+          transcript: DEMO_SAMPLE_TRANSCRIPT,
+          brief,
+          patientName: brief.patient_name,
+          patientAge: brief.patient_age,
+        }),
+      });
+      setCurrentCaseId(savedCase.id);
+      setSavedCaseId(savedCase.id);
+      setSubmitted(true);
+    } finally {
+      setProcessing(false);
+      setDemoActive(false);
+      setDemoConnectionState("idle");
     }
-  }, []);
-
-  useEffect(() => {
-    fetchMode();
-  }, [fetchMode]);
-
-  const handleSessionEnd = useCallback(
-    async (finalTranscript, sessionMeta = {}) => {
-      if (!finalTranscript?.trim()) {
-        setProcessError("No conversation captured. Please try again.");
-        return;
-      }
-
-      try {
-        setProcessing(true);
-        setProcessError(null);
-
-        const extractPath = useRealtime ? "/api/extract" : "/api/fallback-extract";
-        const brief = await apiCall(extractPath, {
-          method: "POST",
-          body: JSON.stringify({ transcript: finalTranscript }),
-        });
-
-        let visualObservation = null;
-        if (sessionMeta.patientSnapshot) {
-          try {
-            visualObservation = await apiCall("/api/analyze-snapshot", {
-              method: "POST",
-              body: JSON.stringify({ image: sessionMeta.patientSnapshot }),
-            });
-          } catch {
-            /* vision analysis is optional — case still saves with photo */
-          }
-        }
-
-        const { data: savedCase } = await apiCall("/api/cases", {
-          method: "POST",
-          body: JSON.stringify({
-            transcript: finalTranscript,
-            brief,
-            patientName: brief.patient_name,
-            patientAge: brief.patient_age,
-            patientSnapshot: sessionMeta.patientSnapshot || null,
-            visualObservation,
-          }),
-        });
-
-        setCurrentCaseId(savedCase.id);
-        setSavedCaseId(savedCase.id);
-        setSubmitted(true);
-      } catch (err) {
-        setProcessError(err.message);
-      } finally {
-        setProcessing(false);
-      }
-    },
-    [setCurrentCaseId, useRealtime]
-  );
-
-  const voice = useVoice({
-    useRealtime: useRealtime !== false,
-    language,
-    onTranscriptUpdate: setTranscript,
-    onMessagesUpdate: setMessages,
-    onSessionEnd: handleSessionEnd,
-  });
+  }, [setCurrentCaseId]);
 
   const runDemoIntake = useCallback(async () => {
     setDemoActive(true);
@@ -129,60 +67,34 @@ export default function PatientTalk() {
     setMessages([]);
     setCallSeconds(0);
 
-    await new Promise((r) => setTimeout(r, 800));
-    setDemoConnectionState("agent-speaking");
-
+    await new Promise((r) => setTimeout(r, 600));
     for (let i = 0; i < DEMO_SAMPLE_MESSAGES.length; i++) {
       const msg = DEMO_SAMPLE_MESSAGES[i];
       setDemoConnectionState(msg.role === "agent" ? "agent-speaking" : "user-speaking");
-      await new Promise((r) => setTimeout(r, 1200));
+      await new Promise((r) => setTimeout(r, 900));
       setMessages((prev) => [...prev, msg]);
     }
-
     setDemoConnectionState("wrapping-up");
-    await handleSessionEnd(DEMO_SAMPLE_TRANSCRIPT, {});
-    setDemoActive(false);
-    setDemoConnectionState("idle");
-  }, [handleSessionEnd]);
-
-  const isConversationActive = IS_DEMO_MODE
-    ? demoActive
-    : !["idle", "error"].includes(voice.connectionState);
-  const canStart = IS_DEMO_MODE
-    ? !demoActive && !processing && !submitted
-    : voice.connectionState === "idle" || voice.connectionState === "error";
-  const stageConnectionState = IS_DEMO_MODE ? demoConnectionState : voice.connectionState;
-  const stageMessages = IS_DEMO_MODE ? messages : voice.messages.length ? voice.messages : messages;
+    await finishIntake();
+  }, [finishIntake]);
 
   useEffect(() => {
-    if (!isConversationActive) {
+    if (!demoActive) {
       setCallSeconds(0);
       return;
     }
-    const timer = setInterval(() => {
-      setCallSeconds((s) => s + 1);
-    }, 1000);
+    const timer = setInterval(() => setCallSeconds((s) => s + 1), 1000);
     return () => clearInterval(timer);
-  }, [isConversationActive]);
+  }, [demoActive]);
 
   const handleNewCall = () => {
     setSubmitted(false);
     setSavedCaseId(null);
-    setTranscript("");
     setMessages([]);
-    setProcessError(null);
     setCallSeconds(0);
     setDemoActive(false);
     setDemoConnectionState("idle");
   };
-
-  if (!IS_DEMO_MODE && useRealtime === null && !modeError) {
-    return (
-      <div className="bauhaus-container px-4 py-12 sm:px-6 lg:px-8">
-        <LoadingSpinner label="Initializing voice service..." />
-      </div>
-    );
-  }
 
   if (submitted) {
     return (
@@ -194,24 +106,27 @@ export default function PatientTalk() {
             <p className="mx-auto mt-4 max-w-sm text-lg font-bold leading-relaxed text-white/90">
               Your details have been sent to the doctor.
             </p>
-            <p className="mt-2 text-sm font-medium text-white/60">
-              They will review your case along with imaging, labs, and your voice transcript.
-            </p>
           </Card>
-
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+          <div className="mt-6 flex flex-col gap-3">
             <Button
-              variant="yellow"
+              variant="red"
               shape="square"
-              className="flex-1 !py-4"
-              onClick={() => openDoctorView(navigate, savedCaseId)}
+              className="w-full !py-4"
+              as={Link}
+              to={savedCaseId ? `/patient/prescription/${savedCaseId}` : "/patient/prescription"}
             >
-              <Stethoscope className="h-5 w-5" strokeWidth={3} />
-              Preview Doctor View
+              <FileText className="h-5 w-5" strokeWidth={3} />
+              Dawai Report
             </Button>
-            <Button variant="outline" shape="square" className="flex-1 !py-4" onClick={handleNewCall}>
-              Start New Call
-            </Button>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button variant="yellow" shape="square" className="flex-1 !py-4" onClick={() => openDoctorView(navigate, savedCaseId)}>
+                <Stethoscope className="h-5 w-5" strokeWidth={3} />
+                Doctor View
+              </Button>
+              <Button variant="outline" shape="square" className="flex-1 !py-4" onClick={handleNewCall}>
+                New Intake
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -222,38 +137,24 @@ export default function PatientTalk() {
     <div className="bauhaus-section bg-background dot-grid">
       <div className="bauhaus-container mx-auto max-w-2xl">
         <header className="mb-8 text-center">
-          <p className="bauhaus-label text-bauhaus-red">Eye Clinic · 2–3 Min Intake</p>
-          <h1 className="bauhaus-heading mt-2 text-4xl sm:text-5xl">Call with Rakshak</h1>
+          <p className="bauhaus-label text-bauhaus-red">Eye Clinic · Intake Demo</p>
+          <h1 className="bauhaus-heading mt-2 text-4xl sm:text-5xl">Rakshak Intake</h1>
           <p className="mt-4 font-medium leading-relaxed text-foreground/75">
-            Ophthalmology voice intake for decreased vision and eye complaints. Rakshak asks structured
-            questions — your doctor receives a standard clinical sheet in medical English.
-            {IS_DEMO_MODE && (
-              <span className="mt-2 block font-bold text-bauhaus-red">
-                Public demo: tap Play Demo Intake below. Live mic + OpenAI voice on localhost only.
-              </span>
-            )}
+            Structured ophthalmology intake demo — decreased vision questionnaire, then doctor handoff.
           </p>
         </header>
 
-        {modeError && (
-          <div className="mb-6">
-            <ErrorBanner message={modeError} onRetry={fetchMode} />
-          </div>
-        )}
-
-        {canStart && !processing && (
+        {!demoActive && !processing && (
           <Card decorationIndex={1} className="mb-6 !shadow-bauhaus">
-            <p className="bauhaus-label mb-3 text-bauhaus-blue">Choose Language</p>
+            <p className="bauhaus-label mb-3 text-bauhaus-blue">Language (Demo UI)</p>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {LANGUAGES.map((lang) => (
                 <button
                   key={lang.id}
                   type="button"
                   onClick={() => setLanguage(lang.id)}
-                  className={`border-2 border-foreground p-3 text-left transition-all duration-200 ${
-                    language === lang.id
-                      ? "bg-bauhaus-yellow shadow-bauhaus"
-                      : "bg-white hover:bg-muted"
+                  className={`border-2 border-foreground p-3 text-left transition-all ${
+                    language === lang.id ? "bg-bauhaus-yellow shadow-bauhaus" : "bg-white hover:bg-muted"
                   }`}
                 >
                   <p className="font-bold uppercase tracking-tight">{lang.label}</p>
@@ -266,80 +167,43 @@ export default function PatientTalk() {
 
         <Card decorationIndex={2} className="!py-8">
           {processing ? (
-            <LoadingSpinner label="Sending your details to the doctor…" />
+            <LoadingSpinner label="Sending to doctor…" />
           ) : (
             <>
-              {isConversationActive && (
+              {demoActive && (
                 <div className="mb-6 flex items-center justify-center gap-2 border-2 border-foreground bg-bauhaus-yellow px-4 py-2 shadow-bauhaus-sm">
-                  <Clock className="h-4 w-4" strokeWidth={2.5} />
+                  <Clock className="h-4 w-4" />
                   <span className="font-black tabular-nums">{formatTime(callSeconds)}</span>
-                  <span className="text-xs font-bold uppercase text-foreground/60">
-                    / {formatTime(MAX_CALL_SECONDS)} max
-                  </span>
                 </div>
               )}
 
               <ConversationStage
-                connectionState={stageConnectionState}
+                connectionState={demoConnectionState}
                 activeSpeaker={
-                  IS_DEMO_MODE
-                    ? demoConnectionState === "agent-speaking"
-                      ? "agent"
-                      : demoConnectionState === "user-speaking"
-                        ? "user"
-                        : null
-                    : voice.activeSpeaker
+                  demoConnectionState === "agent-speaking"
+                    ? "agent"
+                    : demoConnectionState === "user-speaking"
+                      ? "user"
+                      : null
                 }
-                messages={stageMessages}
-                agentPartial={IS_DEMO_MODE ? "" : voice.agentPartial}
-                error={IS_DEMO_MODE ? null : voice.error}
-                videoStream={IS_DEMO_MODE ? null : voice.videoStream}
-                videoRef={voice.videoRef}
+                messages={messages}
+                agentPartial=""
+                error={null}
+                videoStream={null}
+                videoRef={{ current: null }}
               />
 
-              <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-                {canStart ? (
-                  IS_DEMO_MODE ? (
-                    <Button variant="red" shape="pill" onClick={runDemoIntake} className="!gap-2 !px-8">
-                      <Play className="h-5 w-5" strokeWidth={3} />
-                      Play Demo Intake
-                    </Button>
-                  ) : (
-                    <Button variant="red" shape="pill" onClick={voice.start} className="!gap-2 !px-8">
-                      <Phone className="h-5 w-5" strokeWidth={3} />
-                      Start Call
-                    </Button>
-                  )
-                ) : (
-                  !IS_DEMO_MODE && (
-                    <Button
-                      variant="outline"
-                      shape="pill"
-                      onClick={voice.stop}
-                      disabled={voice.connectionState === "wrapping-up"}
-                      className="!gap-2 !px-8"
-                    >
-                      <PhoneOff className="h-5 w-5" strokeWidth={3} />
-                      {voice.connectionState === "wrapping-up" ? "Sending…" : "End Call"}
-                    </Button>
-                  )
-                )}
-              </div>
-
-              {isConversationActive && (
-                <p className="mt-4 text-center text-xs font-medium text-foreground/50">
-                  Quick 2–3 minute intake. Rakshak will wrap up and send your details to the doctor.
-                </p>
+              {!demoActive && (
+                <div className="mt-8 flex justify-center">
+                  <Button variant="red" shape="pill" onClick={runDemoIntake} className="!gap-2 !px-8">
+                    <Play className="h-5 w-5" strokeWidth={3} />
+                    Play Demo Intake
+                  </Button>
+                </div>
               )}
             </>
           )}
         </Card>
-
-        {processError && !processing && (
-          <div className="mt-4">
-            <ErrorBanner message={processError} />
-          </div>
-        )}
       </div>
     </div>
   );

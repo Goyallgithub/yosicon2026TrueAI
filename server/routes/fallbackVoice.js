@@ -2,6 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import { toFile } from "openai";
 import { getOpenAI } from "../lib/openaiClient.js";
+import { createNaturalSpeech } from "../lib/tts.js";
 import { USE_REALTIME } from "../config.js";
 import { VOICE_AGENT_PROMPT, buildVoiceAgentPrompt, VALID_LANGUAGES } from "../prompts/voiceAgent.js";
 import { EXTRACTION_PROMPT } from "../prompts/extraction.js";
@@ -39,19 +40,22 @@ router.post("/transcribe", upload.single("audio"), async (req, res, next) => {
 router.post("/speak", async (req, res, next) => {
   try {
     const client = getOpenAI();
-    const { text } = req.body;
+    const { text, context = "default" } = req.body;
     if (!text || typeof text !== "string" || text.trim().length === 0) {
       return res.status(400).json({ error: "text is required and must be a non-empty string" });
     }
 
-    const speech = await client.audio.speech.create({
-      model: "tts-1",
-      voice: "marin",
-      input: text.trim(),
+    const allowed = ["default", "patient_instruction", "emr_assist", "rakshak"];
+    const speechContext = allowed.includes(context) ? context : "default";
+
+    const speech = await createNaturalSpeech(client, {
+      text,
+      context: speechContext,
     });
 
     const buffer = Buffer.from(await speech.arrayBuffer());
     res.setHeader("Content-Type", "audio/mpeg");
+    res.setHeader("Cache-Control", "no-store");
     res.send(buffer);
   } catch (err) {
     next(err);

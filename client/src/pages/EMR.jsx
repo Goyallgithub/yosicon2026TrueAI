@@ -1,19 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  AlertTriangle,
-  Bot,
-  Eye,
-  FileText,
-  Mic,
-  MicOff,
-  Search,
-  Sparkles,
-  User,
-  Volume2,
-  VolumeX,
-} from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { AlertTriangle, Bot, Eye, Search, Sparkles, User } from "lucide-react";
 import { EMR_PATIENTS } from "../data/emrPatients.js";
-import { apiCall, apiCallBlob, IS_DEMO_MODE } from "../api/client.js";
+import { apiCall } from "../api/client.js";
 import Button from "../components/ui/Button.jsx";
 import Card from "../components/ui/Card.jsx";
 
@@ -29,10 +17,6 @@ export default function EMR() {
   const [aiMessages, setAiMessages] = useState([]);
   const [aiInput, setAiInput] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
-  const [listening, setListening] = useState(false);
-  const [speaking, setSpeaking] = useState(false);
-  const recognitionRef = useRef(null);
-  const audioRef = useRef(null);
 
   const patient = EMR_PATIENTS.find((p) => p.id === selectedId) || EMR_PATIENTS[0];
 
@@ -51,69 +35,6 @@ export default function EMR() {
       },
     ]);
   }, [selectedId, patient.name, patient.mrn]);
-
-  const speakText = useCallback(async (text) => {
-    if (!text?.trim()) return;
-    if (IS_DEMO_MODE && "speechSynthesis" in window) {
-      setSpeaking(true);
-      const utter = new SpeechSynthesisUtterance(text);
-      utter.rate = 1;
-      utter.onend = () => setSpeaking(false);
-      window.speechSynthesis.speak(utter);
-      return;
-    }
-    try {
-      setSpeaking(true);
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-      const blob = await apiCallBlob("/api/speak", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      audioRef.current = audio;
-      audio.onended = () => {
-        URL.revokeObjectURL(url);
-        setSpeaking(false);
-      };
-      await audio.play();
-    } catch {
-      setSpeaking(false);
-    }
-  }, []);
-
-  const startListening = useCallback(() => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      setAiInput((prev) => prev + " [Voice not supported in this browser]");
-      return;
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.lang = "en-IN";
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-
-    recognition.onstart = () => setListening(true);
-    recognition.onend = () => setListening(false);
-    recognition.onerror = () => setListening(false);
-    recognition.onresult = (e) => {
-      const transcript = e.results[0]?.[0]?.transcript;
-      if (transcript) setAiInput(transcript);
-    };
-
-    recognitionRef.current = recognition;
-    recognition.start();
-  }, []);
-
-  const stopListening = useCallback(() => {
-    recognitionRef.current?.stop();
-    setListening(false);
-  }, []);
 
   const sendAiMessage = async (text) => {
     const msg = text?.trim() || aiInput.trim();
@@ -330,7 +251,7 @@ export default function EMR() {
                 </div>
                 <div>
                   <p className="font-black uppercase tracking-tight">AI Clinical Assistant</p>
-                  <p className="text-xs font-medium text-white/60">Voice + text · Medical terminology</p>
+                  <p className="text-xs font-medium text-white/60">Text · Medical terminology</p>
                 </div>
               </div>
             </div>
@@ -357,20 +278,9 @@ export default function EMR() {
                     }`}
                   >
                     {msg.role === "assistant" && (
-                      <div className="mb-1 flex items-center justify-between gap-2">
-                        <span className="flex items-center gap-1 text-[9px] font-black uppercase text-bauhaus-blue">
-                          <Bot className="h-3 w-3" /> AI
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => speakText(msg.text)}
-                          disabled={speaking}
-                          className="text-foreground/50 hover:text-bauhaus-blue"
-                          title="Read aloud"
-                        >
-                          {speaking ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
-                        </button>
-                      </div>
+                      <span className="mb-1 flex items-center gap-1 text-[9px] font-black uppercase text-bauhaus-blue">
+                        <Bot className="h-3 w-3" /> AI
+                      </span>
                     )}
                     <p className="font-medium leading-relaxed">{msg.text}</p>
                   </div>
@@ -394,29 +304,14 @@ export default function EMR() {
                       sendAiMessage();
                     }
                   }}
-                  placeholder="Ask about this patient… (medical terms)"
+                  placeholder="Ask about this patient…"
                   rows={2}
                   className="flex-1 resize-none border-2 border-foreground p-2 text-sm font-medium focus:border-bauhaus-blue focus:outline-none"
                 />
-                <div className="flex flex-col gap-1">
-                  <button
-                    type="button"
-                    onClick={listening ? stopListening : startListening}
-                    className={`flex h-10 w-10 items-center justify-center border-2 border-foreground ${
-                      listening ? "bg-bauhaus-red text-white animate-pulse" : "bg-bauhaus-yellow"
-                    }`}
-                    title={listening ? "Stop listening" : "Voice to text"}
-                  >
-                    {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                  </button>
-                  <Button variant="blue" shape="square" onClick={() => sendAiMessage()} disabled={aiLoading} className="!h-10 !w-10 !p-0">
-                    <FileText className="h-4 w-4" />
-                  </Button>
-                </div>
+                <Button variant="blue" shape="square" onClick={() => sendAiMessage()} disabled={aiLoading} className="!px-4">
+                  Send
+                </Button>
               </div>
-              <p className="mt-2 text-[10px] font-medium text-foreground/40">
-                Mic = voice-to-text · Speaker icon = text-to-speech on AI replies
-              </p>
             </div>
           </Card>
         </aside>
