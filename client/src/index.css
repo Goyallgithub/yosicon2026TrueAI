@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-background font-sans text-foreground antialiased;
+  }
+}
+
+@layer components {
+  .bauhaus-border {
+    @apply border-2 border-foreground lg:border-4;
+  }
+
+  .bauhaus-card {
+    @apply relative border-2 border-foreground bg-white shadow-bauhaus-lg transition-all duration-200 ease-out hover:-translate-y-1 lg:border-4;
+  }
+
+  .bauhaus-heading {
+    @apply font-black uppercase leading-[0.9] tracking-tighter;
+  }
+
+  .bauhaus-label {
+    @apply text-xs font-bold uppercase tracking-widest;
+  }
+
+  .bauhaus-btn {
+    @apply inline-flex items-center justify-center gap-2 border-2 border-foreground font-bold uppercase tracking-wider shadow-bauhaus transition-all duration-200 ease-out active:translate-x-[2px] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .bauhaus-btn-red {
+    @apply bauhaus-btn bg-bauhaus-red text-white hover:bg-bauhaus-red/90;
+  }
+
+  .bauhaus-btn-blue {
+    @apply bauhaus-btn bg-bauhaus-blue text-white hover:bg-bauhaus-blue/90;
+  }
+
+  .bauhaus-btn-yellow {
+    @apply bauhaus-btn bg-bauhaus-yellow text-foreground hover:bg-bauhaus-yellow/90;
+  }
+
+  .bauhaus-btn-outline {
+    @apply bauhaus-btn bg-white text-foreground hover:bg-muted;
+  }
+
+  .bauhaus-section {
+    @apply border-b-4 border-foreground py-12 px-4 sm:py-16 sm:px-6 lg:py-24 lg:px-8;
+  }
+
+  .bauhaus-container {
+    @apply mx-auto max-w-7xl;
+  }
+
+  .dot-grid {
+    background-image: radial-gradient(#121212 2px, transparent 2px);
+    background-size: 20px 20px;
+  }
+
+  @keyframes slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-slide-up {
+    animation: slide-up 0.35s ease-out forwards;
+  }
+
+  @keyframes scan-line {
+    0% { transform: translateY(-100%); }
+    100% { transform: translateY(100%); }
+  }
+
+  .animate-scan-line {
+    animation: scan-line 2.5s linear infinite;
+  }
+}

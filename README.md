@@ -1,36 +1,95 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TrueComplaint AI
 
-## Getting Started
+Voice-powered clinical intake demo — patients describe symptoms via AI conversation; physicians review structured clinical briefs on a triage dashboard.
 
-First, run the development server:
+## Stack
+
+- **Server:** Node.js + Express, OpenAI SDK (Realtime WebRTC, Chat Completions, Whisper, TTS)
+- **Client:** React + Vite, React Router, Zustand, Tailwind CSS
+
+## Setup
+
+### 1. Server
 
 ```bash
+cd server
+cp .env.example .env
+# Add your OpenAI API key to .env
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Server runs on **http://localhost:5000**
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 2. Client
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+cd client
+cp .env.example .env
+npm install
+npm run dev
+```
 
-## Learn More
+Client runs on **http://localhost:5173**
 
-To learn more about Next.js, take a look at the following resources:
+## Environment Variables
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### server/.env
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Variable | Required | Description |
+|---|---|---|
+| `OPENAI_API_KEY` | Yes | OpenAI API key (never exposed to client) |
+| `USE_REALTIME` | No | `true` (default) for WebRTC Realtime; `false` for Whisper+GPT+TTS fallback |
+| `PORT` | No | Server port (default: 5000) |
 
-## Deploy on Vercel
+### client/.env
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Variable | Required | Description |
+|---|---|---|
+| `VITE_API_BASE_URL` | Yes | Backend URL (default: `http://localhost:5000`) |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## API Endpoints
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/realtime-session` | Mint ephemeral token for WebRTC voice |
+| POST | `/api/extract` | Transcript → structured clinical brief |
+| GET | `/api/voice-mode` | Returns `{ useRealtime: boolean }` |
+| POST | `/api/transcribe` | Fallback STT (multipart audio) |
+| POST | `/api/speak` | Fallback TTS |
+| POST | `/api/fallback-turn` | Fallback conversation turn |
+| GET | `/api/cases` | List cases (urgent-first) |
+| GET | `/api/cases/:id` | Get single case |
+| POST | `/api/cases` | Create case after intake |
+| PATCH | `/api/cases/:id` | Update case status |
+
+## User Flows
+
+### Patient
+1. Select "I'm a Patient" on login
+2. Tap mic → voice conversation with TrueComplaint AI
+3. End conversation → transcript extracted → clinical brief saved
+4. View report with urgency level and recommended action
+
+### Doctor
+1. Select "I'm a Doctor" on login
+2. Dashboard shows seeded + new cases sorted by urgency
+3. Open case → review structured brief, transcript, mark as reviewed
+
+## QA Checklist
+
+- [ ] Both servers start without errors
+- [ ] Missing `OPENAI_API_KEY` crashes server with clear message
+- [ ] Mic permission denied shows error (no hang)
+- [ ] Double-click mic doesn't open two sessions
+- [ ] End conversation → mic indicator turns off
+- [ ] Red-flag transcript → `urgency_level: "emergency"`
+- [ ] Short transcript doesn't crash extract
+- [ ] Doctor dashboard shows seeded cases urgent-first
+- [ ] Server down → ErrorBanner on client pages
+
+## Security Notes
+
+- OpenAI API key lives **only** in `server/.env`
+- Client uses ephemeral tokens for Realtime WebRTC
+- No `VITE_*` env vars contain secrets
